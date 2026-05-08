@@ -5,65 +5,60 @@ import folium
 from streamlit_folium import st_folium
 import time
 
-st.set_page_config(page_title="MertNav Cloud", layout="wide")
+# Sayfa Başlığı
+st.set_page_config(page_title="MertNav Karasu", layout="wide")
 
 # Siyah Tema CSS
 st.markdown("""
     <style>
     .stApp { background-color: #050505; }
     h1 { color: #00d4ff; text-align: center; font-family: 'Courier New', monospace; }
-    .stAlert { background-color: #1a1a1a; color: #00FF00; border: 1px solid #00FF00; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("Navigasyon")
-
+st.title("🏙️ MERTNAV: SAKARYA KARASU")
 
 @st.cache_resource
-def load_map():
-    # Başlangıçta tüm bölgeyi değil, merkezi çekiyoruz (Hız için)
-    G = ox.graph_from_place("Istanbul, Turkey", network_type="drive", retain_all=True)
+def load_karasu_map():
+    # Sadece Karasu'yu ve çevresindeki 7 kilometrelik sürüş ağını çekiyoruz
+    # Bu veri çok küçük olduğu için saniyeler içinde yüklenir!
+    G = ox.graph_from_address("Karasu, Sakarya, Turkey", dist=7000, network_type="drive")
     return G
 
+with st.spinner("Karasu haritası hazırlanıyor..."):
+    G = load_karasu_map()
 
-with st.spinner("Harita verileri uydudan çekiliyor..."):
-    G = load_map()
+st.sidebar.success("Karasu Modu Aktif")
 
-st.sidebar.success("Sistem Çevrimiçi (Online)")
-st.sidebar.info("Hedef belirlemek için haritaya dokun.")
+# Karasu merkezli siyah harita
+m = folium.Map(location=[41.10, 30.70], zoom_start=13, tiles="CartoDB dark_matter")
 
-# Ana Harita (Siyah Tema)
-m = folium.Map(location=[41.00, 28.85], zoom_start=11, tiles="CartoDB dark_matter")
-
-# Etkileşimli haritayı göster
+# Haritayı Göster
 map_data = st_folium(m, width="100%", height=500)
 
 if map_data["last_clicked"]:
     t_lat = map_data["last_clicked"]["lat"]
     t_lon = map_data["last_clicked"]["lng"]
-
-    # Animasyon Efekti
-    progress_bar = st.progress(0)
+    
+    # Animasyon Efekti (Mavi-Mor Dalga Ruhunu yaşatıyoruz)
     status_text = st.empty()
+    status_text.text("🔵 Karasu sokaklarında mavi dalgalar yayılıyor...")
+    time.sleep(1)
+    status_text.text("🟣 Mor dalgalar hedefle buluştu...")
+    time.sleep(1)
 
-    for percent_complete in range(100):
-        time.sleep(0.01)
-        progress_bar.progress(percent_complete + 1)
-        if percent_complete < 40:
-            status_text.text("🔵 Mavi dalgalar yayılıyor...")
-        elif percent_complete < 80:
-            status_text.text("🟣 Mor dalgalar karşılanıyor...")
-        else:
-            status_text.text("🟢 Yeşil hat bağlandı!")
-
-    # Rota Hesapla
-    start_node = ox.distance.nearest_nodes(G, 28.85, 41.00)  # Bahçelievler Merkez
+    # Rota Hesaplama (Karasu Merkez'den tıklanan yere)
+    # Karasu merkez koordinatı yaklaşık: 41.100, 30.700
+    start_node = ox.distance.nearest_nodes(G, 30.700, 41.100) 
     target_node = ox.distance.nearest_nodes(G, t_lon, t_lat)
-
-    route = nx.shortest_path(G, start_node, target_node, weight='length')
-    route_coords = [[G.nodes[n]['y'], G.nodes[n]['x']] for n in route]
-
-    # Haritayı Yeşille Güncelle
-    folium.PolyLine(route_coords, color="#00FF00", weight=6, opacity=0.9).add_to(m)
-    st_folium(m, width="100%", height=500, key="final_map")
-    st.balloons()  # Zafer kutlaması!
+    
+    try:
+        route = nx.shortest_path(G, start_node, target_node, weight='length')
+        route_coords = [[G.nodes[n]['y'], G.nodes[n]['x']] for n in route]
+        
+        # Yeşil Zafer Hattı
+        folium.PolyLine(route_coords, color="#00FF00", weight=7, opacity=1).add_to(m)
+        status_text.text("🟢 Karasu hattı bağlandı!")
+        st_folium(m, width="100%", height=500, key="karasu_final")
+    except:
+        st.error("Karasu sınırları dışına tıkladın, biraz daha merkeze odaklan!")
