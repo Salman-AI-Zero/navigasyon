@@ -79,5 +79,5 @@ if destination != "Seçiniz...":
 # Haritayı Göster
 st_folium(m, width="100%", height=500, key="fixed_map")
         
-    except Exception as e:
-        st.sidebar.error("Bu noktaya yol bağlantısı bulunamadı!")
+except Exception as e:
+     st.sidebar.error("Bu noktaya yol bağlantısı bulunamadı!")
