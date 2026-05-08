@@ -4,47 +4,68 @@ import networkx as nx
 import folium
 from streamlit_folium import st_folium
 
-# 1. Sayfa Düzeni
-st.set_page_config(page_title="MertNav: Karasu Pure Edition", layout="wide")
+st.set_page_config(page_title="MertNav: Pure Map", layout="wide")
 
-# 2. Harita Verisi (Bahçelievler Mantığı: Küçük ve Hızlı)
+# Siyah Arka Plan Zorlaması
+st.markdown("<style>.stApp {background-color: #000000;}</style>", unsafe_allow_html=True)
+
 @st.cache_resource
-def get_map():
-    # Sadece Karasu merkezini alıyoruz (Bahçelievler ölçeğinde)
-    location = (41.1030, 30.7020) 
-    G = ox.graph_from_point(location, dist=2500, network_type="drive")
+def get_clean_map():
+    # Karasu merkezli sokak ağı (Görseldeki ölçekte)
+    G = ox.graph_from_address("Karasu, Sakarya, Turkey", dist=3000, network_type="drive")
     return G
 
-G = get_map()
+G = get_clean_map()
+my_pos = [41.1030, 30.7020] # Senin konumun
 
-st.title("🏙️ MERTNAV: K-RS (Bahçelievler Style)")
+# --- SADE HARİTA TASARIMI ---
+# Görseldeki gibi siyah ve boş bir altlık oluşturuyoruz
+m = folium.Map(
+    location=my_pos, 
+    zoom_start=15, 
+    tiles=None, # Arka planı tamamen siliyoruz
+    attr='MertNav Pure Style'
+)
+# Siyah arka planı ekliyoruz
+folium.Rectangle(
+    bounds=[[41.0, 30.6], [41.2, 30.8]], 
+    fill=True, 
+    color='#000000', 
+    fill_opacity=1
+).add_to(m)
 
-# 3. Haritayı Oluştur
-m = folium.Map(location=[41.1030, 30.7020], zoom_start=15, tiles="OpenStreetMap")
+# Sokakları çiz (Sadece beyaz ince çizgiler olarak)
+for u, v, data in G.edges(data=True):
+    if 'geometry' in data:
+        coords = [[p[1], p[0]] for p in list(data['geometry'].coords)]
+        folium.PolyLine(coords, color="#333333", weight=1, opacity=0.8).add_to(m)
 
-# Tıklama Yakalayıcı (En basit haliyle)
-output = st_folium(m, width="100%", height=500, key="karasu_map")
+# Senin Konumun (Görseldeki turkuaz nokta)
+folium.CircleMarker(
+    location=my_pos, 
+    radius=6, 
+    color="#00fbff", 
+    fill=True, 
+    fill_color="#00fbff", 
+    fill_opacity=1
+).add_to(m)
 
-# 4. Tıklama Gelirse Rota Çiz
+# --- TIKLAMA VE ROTA ---
+output = st_folium(m, width="100%", height=600, key="pure_map")
+
 if output and output.get("last_clicked"):
-    clicked = output["last_clicked"]
-    lat, lon = clicked["lat"], clicked["lng"]
-    
-    # En yakın noktalar
-    start_node = ox.nearest_nodes(G, 30.7020, 41.1030) # Senin konumun
-    target_node = ox.nearest_nodes(G, lon, lat)
+    t_lat = output["last_clicked"]["lat"]
+    t_lon = output["last_clicked"]["lng"]
     
     try:
-        # Rota hesapla
-        route = nx.shortest_path(G, start_node, target_node, weight="length")
+        start_node = ox.nearest_nodes(G, my_pos[1], my_pos[0])
+        target_node = ox.nearest_nodes(G, t_lon, t_lat)
+        
+        route = nx.shortest_path(G, start_node, target_node, weight='length')
         route_coords = [[G.nodes[n]['y'], G.nodes[n]['x']] for n in route]
         
-        # Haritaya rota ekle (Yeşil Hat)
-        folium.PolyLine(route_coords, color="green", weight=6).add_to(m)
-        folium.Marker([lat, lon], popup="Hedef").add_to(m)
-        
-        # Haritayı güncelle
-        st.rerun() # Tıklandığı an sayfayı yenile ki rota görünsün
-        
-    except Exception:
-        st.error("Yol bulunamadı, lütfen bir caddeye tıklayın.")
+        # Yeşil Rota (İnce ve Keskin)
+        folium.PolyLine(route_coords, color="#00ff00", weight=4, opacity=1).add_to(m)
+        st.rerun() # Rotayı anında göster
+    except:
+        pass
