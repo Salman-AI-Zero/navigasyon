@@ -1,7 +1,6 @@
 streamlit
 osmnx
+scikit-learn
 networkx
 folium
 streamlit-folium
-scipy
-scikit-learn
