@@ -60,5 +60,7 @@ if map_data["last_clicked"]:
         folium.PolyLine(route_coords, color="#00FF00", weight=7, opacity=1).add_to(m)
         status_text.text("🟢 Karasu hattı bağlandı!")
         st_folium(m, width="100%", height=500, key="karasu_final")
+        if map_data["last_clicked"]:
+    st.sidebar.write(f"📍 Tıklanan Konum: {map_data['last_clicked']['lat']}, {map_data['last_clicked']['lng']}")
     except:
         st.error("Karasu sınırları dışına tıkladın, biraz daha merkeze odaklan!")
