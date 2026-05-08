@@ -16,7 +16,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏙️ MERTNAV: CYBERPUNK EDITION")
+st.title("Navigasyon")
 
 
 @st.cache_resource
