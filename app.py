@@ -4,50 +4,66 @@ import networkx as nx
 import folium
 from streamlit_folium import st_folium
 
-st.set_page_config(page_title="Bahçelievler Rota Planlayıcı", layout="wide")
+# Sayfa Genişliği
+st.set_page_config(page_title="Yol Bulucu", layout="wide")
 
-st.title("📍 Bahçelievler Bi-Directional Search Görselleştirme")
+st.title("📍 Harita Üzerinde Tıkla ve Yol Bul")
+st.write("Başlangıç noktası yeşil işaretçidir. Hedef belirlemek için haritada herhangi bir yola tıklayın.")
 
-@st.cache_data
-def load_graph(place):
-    graph = ox.graph_from_place(place, network_type="drive")
+# 1. Haritayı ve Grafiği Yükle (Önbelleğe alıyoruz ki her seferinde indirmesin)
+@st.cache_resource
+def get_graph():
+    place_name = "Bahcelievler, Istanbul, Turkey"
+    graph = ox.graph_from_place(place_name, network_type="drive")
     return graph
 
-place_name = "Bahcelievler, Istanbul, Turkey"
-graph = load_graph(place_name)
+graph = get_graph()
 
-# Başlangıç noktası (Sabit veya Seçmeli)
+# 2. Başlangıç Noktasını Belirle (Bahçelievler'in merkezi)
 nodes_list = list(graph.nodes())
 start_node = nodes_list[len(nodes_list) // 2]
 start_coords = (graph.nodes[start_node]['y'], graph.nodes[start_node]['x'])
 
-st.sidebar.info("Haritaya tıklayarak bir hedef nokta seçin.")
+# 3. Haritayı Oluştur
+def create_map():
+    m = folium.Map(location=start_coords, zoom_start=14, tiles="OpenStreetMap")
+    folium.Marker(
+        start_coords, 
+        tooltip="Başlangıç Noktası", 
+        icon=folium.Icon(color='green', icon='play')
+    ).add_to(m)
+    return m
 
-# --- Harita Oluşturma ---
-m = folium.Map(location=start_coords, zoom_start=14, tiles="cartodbpositron")
-folium.Marker(start_coords, tooltip="Başlangıç", icon=folium.Icon(color='green')).add_to(m)
+# 4. Tıklama Olayını Yakala
+if 'map_static' not in st.session_state:
+    st.session_state.map_static = create_map()
 
-# Tıklanan noktayı yakala
-output = st_folium(m, width=1000, height=600)
+# Haritayı ekrana bas ve tıklamaları dinle
+output = st_folium(st.session_state.map_static, width="100%", height=500)
 
-target_coords = None
+# Tıklama verisini kontrol et
 if output['last_clicked']:
-    target_coords = (output['last_clicked']['lat'], output['last_clicked']['lng'])
-
-if target_coords:
-    # En yakın düğümü bul
-    target_node = ox.distance.nearest_nodes(graph, target_coords[1], target_coords[0])
+    lat = output['last_clicked']['lat']
+    lng = output['last_clicked']['lng']
     
-    # Rota Hesaplama (Senin Bi-directional mantığın veya hazır A*)
+    st.sidebar.success(f"Hedef Seçildi: {lat:.4f}, {lng:.4f}")
+    
+    # 5. En Yakın Düğümü (Node) Bul ve Yolu Hesapla
+    target_node = ox.distance.nearest_nodes(graph, lng, lat)
+    
     try:
-        # Streamlit'te performansı korumak için nx.shortest_path kullanabilirsin
-        # Kendi özel fonksiyonunu buraya entegre edebilirsin
+        # En kısa yolu hesapla (Senin bi-directional mantığını buraya fonksiyon olarak gömebilirsin)
         route = nx.shortest_path(graph, start_node, target_node, weight='length')
         
-        # Rotayı haritaya ekle
-        route_map = ox.plot_route_folium(graph, route, route_map=m, color="#00FF00", weight=5)
-        st.success("Yol başarıyla hesaplandı!")
-        st_folium(route_map, width=1000, height=600, key="result_map")
+        # Rotayı harita üzerinde göster
+        route_map = ox.plot_route_folium(graph, route, color="red", weight=6, opacity=0.7)
+        
+        # Başlangıç ve bitiş işaretçilerini ekle
+        folium.Marker(start_coords, icon=folium.Icon(color='green')).add_to(route_map)
+        folium.Marker((lat, lng), icon=folium.Icon(color='red', icon='stop')).add_to(route_map)
+        
+        st.subheader("İşte Bulunan En Kısa Yol:")
+        st_folium(route_map, width="100%", height=500, key="result_map")
         
     except Exception as e:
-        st.error(f"Yol bulunamadı: {e}")
+        st.error("Üzgünüm, bu noktaya bir yol bulunamadı. Lütfen bir yola daha yakın tıklayın.")
